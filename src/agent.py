@@ -3,11 +3,45 @@
 import os
 from typing import Optional, List
 from dotenv import load_dotenv
-from langchain.agents import AgentExecutor, create_react_agent
-from langchain.tools import Tool
+from langchain_classic.agents import AgentExecutor, create_react_agent
 from langchain_community.utilities.github import GitHubAPIWrapper
 from langchain_community.agent_toolkits.github.toolkit import GitHubToolkit
-from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
+
+
+class PersonalTokenGitHubAPIWrapper(GitHubAPIWrapper):
+    """Wrapper customizado que suporta tokens pessoais do GitHub."""
+    
+    github_token: Optional[str] = None
+    
+    @classmethod
+    def validate_environment(cls, values):
+        """Validação customizada que suporta tokens pessoais."""
+        # Se temos github_token mas não temos app_id, usar token pessoal
+        github_token = values.get("github_token") or os.getenv("GITHUB_TOKEN")
+        github_repository = values.get("github_repository") or os.getenv("GITHUB_REPOSITORY")
+        
+        if github_token and not values.get("github_app_id"):
+            # Usar token pessoal
+            from github import Github, Auth
+            
+            auth = Auth.Token(github_token)
+            g = Github(auth=auth)
+            repo = g.get_repo(github_repository)
+            
+            values["github"] = g
+            values["github_repo_instance"] = repo
+            values["github_repository"] = github_repository
+            values["active_branch"] = repo.default_branch
+            values["github_base_branch"] = repo.default_branch
+            values["github_app_id"] = None
+            values["github_app_private_key"] = None
+            values["github_token"] = github_token
+            
+            return values
+        else:
+            # Usar validação padrão para GitHub Apps
+            return super().validate_environment(values)
+from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint, HuggingFacePipeline
 from langchain_core.prompts import PromptTemplate
 
 from src.prompts import get_system_prompt_with_examples
@@ -17,12 +51,13 @@ from src.token_monitor import TokenMonitor
 load_dotenv()
 
 
-def setup_github_toolkit(github_token: Optional[str] = None) -> GitHubToolkit:
+def setup_github_toolkit(github_token: Optional[str] = None, github_repository: Optional[str] = None) -> GitHubToolkit:
     """
     Configura e inicializa o Github Toolkit do LangChain.
     
     Args:
         github_token: Token de acesso do GitHub (se None, usa GITHUB_TOKEN do .env)
+        github_repository: Repositório no formato owner/repo (se None, usa REPO_OWNER/REPO_NAME do .env)
         
     Returns:
         GitHubToolkit configurado
@@ -38,19 +73,24 @@ def setup_github_toolkit(github_token: Optional[str] = None) -> GitHubToolkit:
             "GITHUB_TOKEN não encontrado. Configure no arquivo .env ou passe como argumento."
         )
     
-    # Criar wrapper da API do GitHub
-    github = GitHubAPIWrapper(github_token=github_token)
+    # Obter informações do repositório
+    if github_repository is None:
+        repo_owner = os.getenv("REPO_OWNER", "langchain-ai")
+        repo_name = os.getenv("REPO_NAME", "langchain")
+        github_repository = f"{repo_owner}/{repo_name}"
+    
+    # Usar wrapper customizado que suporta tokens pessoais
+    github = PersonalTokenGitHubAPIWrapper(
+        github_token=github_token,
+        github_repository=github_repository
+    )
     
     # Criar toolkit com todas as ferramentas disponíveis
     toolkit = GitHubToolkit.from_github_api_wrapper(github)
     
     # Testar conexão básica
     try:
-        repo_owner = os.getenv("REPO_OWNER", "langchain-ai")
-        repo_name = os.getenv("REPO_NAME", "langchain")
-        # Teste simples: verificar se consegue acessar o repositório
-        # Isso será feito implicitamente quando o agente usar as tools
-        print(f"✓ Github Toolkit configurado para {repo_owner}/{repo_name}")
+        print(f"✓ Github Toolkit configurado para {github_repository}")
     except Exception as e:
         print(f"⚠ Aviso ao configurar Github Toolkit: {e}")
     
@@ -95,34 +135,49 @@ def create_agent(
         # Tentar usar HuggingFaceEndpoint primeiro (para modelos na nuvem)
         hf_token = os.getenv("HUGGINGFACE_API_TOKEN")
         if hf_token:
-            llm = HuggingFaceEndpoint(
+            # Criar HuggingFaceEndpoint e depois ChatHuggingFace
+            hf_endpoint = HuggingFaceEndpoint(
                 repo_id=model_name,
                 huggingfacehub_api_token=hf_token,
                 temperature=temperature,
                 max_length=max_tokens,
             )
+            llm = ChatHuggingFace(llm=hf_endpoint)
         else:
-            # Usar modelo local via ChatHuggingFace
-            from langchain_huggingface import ChatHuggingFace
-            llm = ChatHuggingFace(
-                model_name=model_name,
+            # Usar modelo local via HuggingFacePipeline e ChatHuggingFace
+            from transformers import pipeline
+            
+            # Criar pipeline local
+            pipe = pipeline(
+                "text-generation",
+                model=model_name,
                 temperature=temperature,
-                max_tokens=max_tokens,
+                max_new_tokens=max_tokens,
             )
+            hf_pipeline = HuggingFacePipeline(pipeline=pipe)
+            llm = ChatHuggingFace(llm=hf_pipeline)
     except Exception as e:
         print(f"⚠ Erro ao carregar modelo {model_name}: {e}")
-        print("Tentando usar modelo padrão...")
-        # Fallback para modelo mais leve
-        llm = ChatHuggingFace(
-            model_name="microsoft/DialoGPT-medium",
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
+        print("Tentando usar modelo padrão via HuggingFaceEndpoint...")
+        # Fallback: tentar usar HuggingFaceEndpoint sem token (pode funcionar para modelos públicos)
+        try:
+            hf_endpoint = HuggingFaceEndpoint(
+                repo_id="microsoft/DialoGPT-medium",
+                temperature=temperature,
+                max_length=max_tokens,
+            )
+            llm = ChatHuggingFace(llm=hf_endpoint)
+        except Exception as e2:
+            raise ValueError(
+                f"Não foi possível carregar nenhum modelo. "
+                f"Erro original: {e}. Erro no fallback: {e2}"
+            )
     
     # Criar prompt template (ReAct format)
     system_prompt = get_system_prompt_with_examples()
     
-    prompt_template = f"""{system_prompt}
+    # Usar format() em vez de f-string para evitar interpretação de variáveis escapadas
+    prompt_template = """{system_prompt}
 
 Você tem acesso às seguintes ferramentas:
 
@@ -140,7 +195,7 @@ Thought: Agora sei a resposta final
 Final Answer: a resposta final à pergunta original
 
 Question: {{input}}
-Thought:{{agent_scratchpad}}"""
+Thought:{{agent_scratchpad}}""".format(system_prompt=system_prompt)
     
     prompt = PromptTemplate.from_template(prompt_template)
     
@@ -171,7 +226,8 @@ def test_github_connection(repo_owner: str, repo_name: str) -> bool:
         True se a conexão funcionar, False caso contrário
     """
     try:
-        toolkit = setup_github_toolkit()
+        github_repository = f"{repo_owner}/{repo_name}"
+        toolkit = setup_github_toolkit(github_repository=github_repository)
         # Usar uma tool simples para testar
         tools = toolkit.get_tools()
         if tools:

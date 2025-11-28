@@ -19,61 +19,61 @@ FORMATO DE RESPOSTA:
 FEW_SHOT_EXAMPLES = [
     {
         "input": "Quais issues abertas têm a label 'bug'?",
-        "output": """Encontrei {count} issues abertas com a label 'bug':
+        "output": """Encontrei [N] issues abertas com a label 'bug':
 
-1. Issue #{num1}: {title1} - {url1}
-2. Issue #{num2}: {title2} - {url2}
-3. Issue #{num3}: {title3} - {url3}
+1. Issue #[NUM1]: [TÍTULO1] - [URL1]
+2. Issue #[NUM2]: [TÍTULO2] - [URL2]
+3. Issue #[NUM3]: [TÍTULO3] - [URL3]
 
 Fonte: Issues do repositório com label 'bug' e status 'open'."""
     },
     {
         "input": "Qual foi a mudança no arquivo src/main.py no último commit?",
-        "output": """O último commit que alterou src/main.py foi {sha} por {author} em {date}.
+        "output": """O último commit que alterou src/main.py foi [SHA] por [AUTOR] em [DATA].
 
 Mudanças principais:
-- {change1}
-- {change2}
-- {change3}
+- [MUDANÇA1]
+- [MUDANÇA2]
+- [MUDANÇA3]
 
-Fonte: Commit {sha} no arquivo src/main.py. Veja detalhes completos em: {commit_url}"""
+Fonte: Commit [SHA] no arquivo src/main.py. Veja detalhes completos em: [URL_COMMIT]"""
     },
     {
         "input": "Quem foi o autor do último pull request mergeado?",
-        "output": """O último pull request mergeado foi #{pr_number} por {author} em {date}.
+        "output": """O último pull request mergeado foi #[PR_NUM] por [AUTOR] em [DATA].
 
-Título: {title}
-Descrição: {description}
+Título: [TÍTULO]
+Descrição: [DESCRIÇÃO]
 
-Fonte: Pull Request #{pr_number} - {pr_url}"""
+Fonte: Pull Request #[PR_NUM] - [URL_PR]"""
     },
     {
         "input": "Mostre o conteúdo do arquivo README.md",
         "output": """Conteúdo do arquivo README.md:
 
-{file_content}
+[CONTEÚDO_ARQUIVO]
 
-Última modificação: Commit {sha} por {author} em {date}
-Fonte: Arquivo README.md - {file_url}"""
+Última modificação: Commit [SHA] por [AUTOR] em [DATA]
+Fonte: Arquivo README.md - [URL_ARQUIVO]"""
     },
     {
         "input": "Quantos commits foram feitos na última semana?",
-        "output": """Foram feitos {count} commits na última semana.
+        "output": """Foram feitos [N] commits na última semana.
 
 Principais contribuidores:
-- {author1}: {count1} commits
-- {author2}: {count2} commits
+- [AUTOR1]: [N1] commits
+- [AUTOR2]: [N2] commits
 
-Fonte: Commits do repositório entre {start_date} e {end_date}"""
+Fonte: Commits do repositório entre [DATA_INICIO] e [DATA_FIM]"""
     },
     {
         "input": "Quais arquivos foram modificados no commit abc123?",
-        "output": """O commit abc123 modificou {count} arquivos:
+        "output": """O commit abc123 modificou [N] arquivos:
 
-1. {file1} - {status1} ({additions}+ adições, {deletions}- remoções)
-2. {file2} - {status2} ({additions}+ adições, {deletions}- remoções)
+1. [ARQUIVO1] - [STATUS1] ([ADICÕES]+ adições, [REMOÇÕES]- remoções)
+2. [ARQUIVO2] - [STATUS2] ([ADICÕES]+ adições, [REMOÇÕES]- remoções)
 
-Fonte: Commit abc123 - {commit_url}"""
+Fonte: Commit abc123 - [URL_COMMIT]"""
     }
 ]
 
