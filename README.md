@@ -57,7 +57,9 @@ copy config\env.example .env
 cp config/env.example .env
 ```
 
-Edite o arquivo `.env` e configure:
+O arquivo `config/env.example` **já contém todas as chaves necessárias**; ao copiar para `.env` você só precisa preencher/ajustar os valores conforme seu uso.
+
+Resumo das principais variáveis:
 
 ```env
 # Token do GitHub (obrigatório)
@@ -65,7 +67,7 @@ Edite o arquivo `.env` e configure:
 # Permissões necessárias: repo (read-only)
 GITHUB_TOKEN=seu_token_aqui
 
-# Token do HuggingFace (opcional, apenas para modelos privados)
+# Token do HuggingFace
 HUGGINGFACE_API_TOKEN=
 
 # Repositório alvo

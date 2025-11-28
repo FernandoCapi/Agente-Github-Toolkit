@@ -140,7 +140,7 @@ def create_agent(
                 repo_id=model_name,
                 huggingfacehub_api_token=hf_token,
                 temperature=temperature,
-                max_length=max_tokens,
+                max_new_tokens=max_tokens,
             )
             llm = ChatHuggingFace(llm=hf_endpoint)
         else:
@@ -164,7 +164,7 @@ def create_agent(
             hf_endpoint = HuggingFaceEndpoint(
                 repo_id="microsoft/DialoGPT-medium",
                 temperature=temperature,
-                max_length=max_tokens,
+                max_new_tokens=max_tokens,
             )
             llm = ChatHuggingFace(llm=hf_endpoint)
         except Exception as e2:
